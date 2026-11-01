@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#07130f">
+  <title>Petualangan Dunia Misterius 3D</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#07130f; font-family:system-ui, sans-serif; color:#fff; touch-action:none; }
+    #game { position:fixed; inset:0; }
+    canvas { display:block; width:100%; height:100%; }
+    #hud { position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between; gap:8px; pointer-events:none; }
+    .panel { background:rgba(3,15,12,.72); border:1px solid rgba(170,230,194,.22); border-radius:12px; padding:9px 12px; backdrop-filter:blur(8px); font-size:13px; box-shadow:0 4px 18px #0005; }
+    #title { font-weight:800; letter-spacing:.3px; font-size:14px; }
+    #mission { position:fixed; top:68px; left:12px; max-width:230px; }
+    #message { position:fixed; left:50%; top:22%; transform:translateX(-50%); padding:10px 16px; border-radius:12px; background:#06140fe8; border:1px solid #8ee6ae66; font-weight:700; text-align:center; opacity:0; transition:opacity .25s; pointer-events:none; }
+    #controls { position:fixed; inset:auto 0 18px 0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 18px; pointer-events:none; }
+    .pad { display:grid; grid-template-columns:58px 58px 58px; grid-template-rows:58px 58px; gap:6px; pointer-events:auto; }
+    button { border:1px solid #d5ffe066; background:rgba(5,24,18,.76); color:white; border-radius:15px; font-size:22px; font-weight:800; box-shadow:0 5px 16px #0006; touch-action:none; user-select:none; -webkit-user-select:none; }
+    button:active, button.active { background:rgba(46,125,80,.92); transform:scale(.96); }
+    #up { grid-column:2; grid-row:1; } #left { grid-column:1; grid-row:2; } #down { grid-column:2; grid-row:2; } #right { grid-column:3; grid-row:2; }
+    #jump { width:78px; height:78px; border-radius:50%; font-size:15px; background:rgba(30,105,75,.88); pointer-events:auto; }
+    #help { position:fixed; bottom:162px; right:18px; font-size:11px; color:#e5f6e8; text-shadow:0 2px 4px #000; pointer-events:none; }
+    #start { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:24px; background:linear-gradient(#06140dbb,#06140dee); }
+    #startCard { max-width:390px; width:100%; text-align:center; padding:25px; border-radius:22px; background:#0b2119ee; border:1px solid #a5e7bd55; box-shadow:0 18px 60px #0009; }
+    #startCard h1 { font-size:25px; line-height:1.15; margin:0 0 10px; }
+    #startCard p { color:#c5dbcd; font-size:14px; line-height:1.5; }
+    #play { padding:13px 25px; background:#2e9b68; font-size:16px; border:0; margin-top:8px; }
+    @media (max-width:420px) { .pad { grid-template-columns:52px 52px 52px; grid-template-rows:52px 52px; } #mission { top:70px; } #title { font-size:12px; } }
+  </style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+  <div class="panel"><div id="title">PETUALANGAN DUNIA MISTERIUS</div><div>Penjelajah Kristal</div></div>
+  <div class="panel">💎 Kristal: <b id="score">0</b>/5</div>
+</div>
+<div id="mission" class="panel">🎯 Misi: Temukan 5 kristal legendaris di hutan misterius.</div>
+<div id="message"></div>
+<div id="controls">
+  <div class="pad">
+    <button id="up" aria-label="Maju">▲</button>
+    <button id="left" aria-label="Kiri">◀</button>
+    <button id="down" aria-label="Mundur">▼</button>
+    <button id="right" aria-label="Kanan">▶</button>
+  </div>
+  <button id="jump">LOMPAT</button>
+</div>
+<div id="help">Gunakan tombol arah untuk bergerak</div>
+<div id="start">
+  <div id="startCard">
+    <h1>Petualangan Dunia Misterius 3D</h1>
+    <p><b>Pencarian Kristal Legendaris</b><br>Jelajahi hutan berkabut, hindari pepohonan, dan kumpulkan lima kristal bercahaya.</p>
+    <p>Gunakan tombol arah untuk bergerak dan tombol LOMPAT untuk melompat.</p>
+    <button id="play">MULAI PETUALANGAN</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const host = document.getElementById('game');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9bb9b0);
+scene.fog = new THREE.FogExp2(0x9bb9b0, 0.012);
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 250);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+host.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xd9f3ff, 0x354b2b, 2.0));
+const sun = new THREE.DirectionalLight(0xffe7c2, 2.3);
+sun.position.set(-25, 45, 20); sun.castShadow = true;
+sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(220,220), new THREE.MeshStandardMaterial({color:0x456b43, roughness:1}));
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+// Undulating distant mountain silhouettes
+for(let i=0;i<13;i++){
+  const h=12+Math.random()*20, r=10+Math.random()*13;
+  const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,5),new THREE.MeshStandardMaterial({color:i%2?0x526d68:0x647b72,roughness:1}));
+  m.position.set(-85+i*14,h/2-2,-78-Math.random()*18); m.rotation.y=Math.random(); scene.add(m);
+}
+
+// Forest trees
+const trunkMat=new THREE.MeshStandardMaterial({color:0x493526,roughness:1});
+const leafMats=[0x183f2c,0x245338,0x315d3b].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:1}));
+for(let i=0;i<105;i++){
+  const x=(Math.random()-.5)*180, z=(Math.random()-.5)*175;
+  if(Math.abs(x)<9 && z> -20 && z<25) continue;
+  const height=4+Math.random()*5;
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.38,height,7),trunkMat);
+  trunk.position.set(x,height/2,z); trunk.castShadow=true; scene.add(trunk);
+  for(let j=0;j<3;j++){
+    const crown=new THREE.Mesh(new THREE.ConeGeometry(1.8+j*.38,3.6,7),leafMats[Math.floor(Math.random()*leafMats.length)]);
+    crown.position.set(x,height-0.4+j*1.45,z); crown.castShadow=true; scene.add(crown);
+  }
+}
+
+// Rocks and forest floor details
+for(let i=0;i<55;i++){
+  const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.35+Math.random()*.8,0),new THREE.MeshStandardMaterial({color:0x66716a,roughness:1}));
+  rock.position.set((Math.random()-.5)*150,.2,(Math.random()-.5)*145);
+  rock.scale.y=.55; rock.rotation.set(Math.random(),Math.random(),Math.random()); scene.add(rock);
+}
+
+// Simple explorer character
+const player=new THREE.Group(); scene.add(player);
+const bodyMat=new THREE.MeshStandardMaterial({color:0x315b4a,roughness:.85});
+const darkMat=new THREE.MeshStandardMaterial({color:0x26332d,roughness:1});
+const skinMat=new THREE.MeshStandardMaterial({color:0xc98f68,roughness:1});
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.48,.85,4,8),bodyMat); torso.position.y=1.35; torso.castShadow=true; player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.34,16,12),skinMat); head.position.y=2.15; head.castShadow=true; player.add(head);
+const hair=new THREE.Mesh(new THREE.SphereGeometry(.35,12,8,0,Math.PI*2,0,Math.PI/2),darkMat); hair.position.y=2.29; player.add(hair);
+const backpack=new THREE.Mesh(new THREE.BoxGeometry(.58,.72,.28),new THREE.MeshStandardMaterial({color:0x765033})); backpack.position.set(0,1.4,.48); player.add(backpack);
+const legs=[];
+for(const x of [-.2,.2]){
+ const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.16,.62,3,7),darkMat); leg.position.set(x,.48,0); player.add(leg); legs.push(leg);
+}
+player.position.set(0,0,12);
+
+// Crystal collectibles
+const crystals=[];
+const crystalMat=new THREE.MeshStandardMaterial({color:0x62f4ff, emissive:0x12c9e8, emissiveIntensity:2.2, metalness:.25, roughness:.18});
+const positions=[[-18,0,-15],[19,0,-27],[-27,0,22],[28,0,18],[0,0,-52]];
+for(const [x,y,z] of positions){
+ const g=new THREE.Group();
+ const gem=new THREE.Mesh(new THREE.OctahedronGeometry(1.05,0),crystalMat); gem.position.y=1.6; gem.castShadow=true; g.add(gem);
+ const glow=new THREE.PointLight(0x39eaff,2.5,9); glow.position.y=1.5; g.add(glow);
+ const base=new THREE.Mesh(new THREE.CylinderGeometry(.8,.95,.25,8),new THREE.MeshStandardMaterial({color:0x8b9a8b,metalness:.5,roughness:.35})); base.position.y=.13; g.add(base);
+ g.position.set(x,0,z); scene.add(g); crystals.push({group:g,gem,collected:false});
+}
+
+const keys={up:false,down:false,left:false,right:false};
+const buttons={up:'up',down:'down',left:'left',right:'right'};
+for(const [key,id] of Object.entries(buttons)){
+ const el=document.getElementById(id);
+ const on=e=>{e.preventDefault();keys[key]=true;el.classList.add('active');};
+ const off=e=>{e.preventDefault();keys[key]=false;el.classList.remove('active');};
+ el.addEventListener('pointerdown',on); el.addEventListener('pointerup',off);
+ el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off);
+}
+let jumping=false, vy=0, score=0, started=false, elapsed=0;
+const jumpBtn=document.getElementById('jump');
+function jump(){if(started && !jumping){jumping=true;vy=7.2;}}
+jumpBtn.addEventListener('pointerdown',e=>{e.preventDefault();jumpBtn.classList.add('active');jump();});
+['pointerup','pointercancel','pointerleave'].forEach(ev=>jumpBtn.addEventListener(ev,()=>jumpBtn.classList.remove('active')));
+addEventListener('keydown',e=>{
+ if(['ArrowUp','w','W'].includes(e.key)) keys.up=true;
+ if(['ArrowDown','s','S'].includes(e.key)) keys.down=true;
+ if(['ArrowLeft','a','A'].includes(e.key)) keys.left=true;
+ if(['ArrowRight','d','D'].includes(e.key)) keys.right=true;
+ if(e.code==='Space') jump();
+});
+addEventListener('keyup',e=>{
+ if(['ArrowUp','w','W'].includes(e.key)) keys.up=false;
+ if(['ArrowDown','s','S'].includes(e.key)) keys.down=false;
+ if(['ArrowLeft','a','A'].includes(e.key)) keys.left=false;
+ if(['ArrowRight','d','D'].includes(e.key)) keys.right=false;
+});
+
+const msg=document.getElementById('message');
+let msgTimer;
+function notify(t){msg.textContent=t;msg.style.opacity=1;clearTimeout(msgTimer);msgTimer=setTimeout(()=>msg.style.opacity=0,1900);}
+document.getElementById('play').addEventListener('click',()=>{
+ started=true; document.getElementById('start').style.display='none'; notify('Petualangan dimulai! Temukan kristalnya.');
+});
+
+const clock=new THREE.Clock();
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.04); elapsed+=dt;
+ if(started){
+   let dx=(keys.right?1:0)-(keys.left?1:0);
+   let dz=(keys.down?1:0)-(keys.up?1:0);
+   const len=Math.hypot(dx,dz)||1; dx/=len; dz/=len;
+   const speed=7.2;
+   player.position.x+=dx*speed*dt;
+   player.position.z+=dz*speed*dt;
+   player.position.x=THREE.MathUtils.clamp(player.position.x,-75,75);
+   player.position.z=THREE.MathUtils.clamp(player.position.z,-75,75);
+   if(dx||dz){player.rotation.y=Math.atan2(dx,dz); legs[0].rotation.x=Math.sin(elapsed*11)*.65; legs[1].rotation.x=-Math.sin(elapsed*11)*.65;}
+   else {legs.forEach(l=>l.rotation.x=0);}
+   if(jumping){player.position.y+=vy*dt;vy-=18*dt;if(player.position.y<=0){player.position.y=0;jumping=false;vy=0;}}
+   for(const c of crystals){
+     if(c.collected) continue;
+     c.gem.rotation.y+=dt*1.5; c.gem.rotation.z=Math.sin(elapsed*2)*.12;
+     c.group.position.y=Math.sin(elapsed*2+c.group.position.x)*.12;
+     if(player.position.distanceTo(c.group.position)<2.5){
+       c.collected=true;c.group.visible=false;score++;
+       document.getElementById('score').textContent=score;
+       notify('Kristal ditemukan! ✨');
+       if(score===5){document.getElementById('mission').textContent='🏆 Misi selesai! Semua kristal legendaris terkumpul.';notify('HEBAT! Petualangan berhasil diselesaikan!');}
+     }
+   }
+ }
+ const target=new THREE.Vector3(player.position.x,player.position.y+2,player.position.z);
+ const camOffset=new THREE.Vector3(0,6.5,10.5);
+ const desired=target.clone().add(camOffset);
+ camera.position.lerp(desired,.075); camera.lookAt(target);
+ renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+});
+</script>
+</body>
+</html>
